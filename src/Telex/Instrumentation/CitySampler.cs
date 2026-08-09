@@ -16,7 +16,7 @@ namespace Telex.Instrumentation
             dlcSampler = new DlcReflectionSampler();
         }
 
-        public int GetCurrentGameHour()
+        public int GetCurrentGameDay()
         {
             var simulation = Singleton<SimulationManager>.instance;
             if (simulation == null)
@@ -24,7 +24,7 @@ namespace Telex.Instrumentation
                 return -1;
             }
 
-            return simulation.m_currentGameTime.DayOfYear * 24 + simulation.m_currentGameTime.Hour;
+            return GetAbsoluteGameDay(simulation.m_currentGameTime);
         }
 
         public IList<TelemetryRecord> Sample(float realTimeInterval, float simulationTimeDelta)
@@ -47,7 +47,6 @@ namespace Telex.Instrumentation
             record.SchemaVersion = 1;
             record.Type = type;
             record.CityName = GetCityName();
-            record.SampledAtUtc = DateTime.UtcNow;
             record.RealTimeIntervalSeconds = realTimeInterval;
             record.SimulationTimeDeltaSeconds = simulationTimeDelta;
             record.Data = data;
@@ -55,8 +54,9 @@ namespace Telex.Instrumentation
             if (simulation != null)
             {
                 record.CurrentFrameIndex = simulation.m_currentFrameIndex;
-                record.CurrentGameTime = simulation.m_currentGameTime;
-                record.AbsoluteDay = (int)simulation.m_currentGameTime.Subtract(new DateTime(simulation.m_currentGameTime.Year, 1, 1)).TotalDays;
+                record.GameTime = simulation.m_currentGameTime;
+                record.Date = simulation.m_currentGameTime.ToString("yyyy-MM-dd");
+                record.AbsoluteDay = GetAbsoluteGameDay(simulation.m_currentGameTime);
             }
 
             return record;
@@ -208,6 +208,11 @@ namespace Telex.Instrumentation
             }
 
             return null;
+        }
+
+        private static int GetAbsoluteGameDay(DateTime gameTime)
+        {
+            return (int)gameTime.Date.Subtract(new DateTime(gameTime.Year, 1, 1)).TotalDays;
         }
 
         private static object Vector(Vector3 value)

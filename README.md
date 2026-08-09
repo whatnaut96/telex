@@ -1,6 +1,6 @@
 # Telex
 
-Telex is a Cities: Skylines 1 instrumentation mod scaffold. It samples city state once per in-game hour and publishes JSON envelopes over HTTP for later analysis.
+Telex is a Cities: Skylines 1 instrumentation mod scaffold. It samples city state once per in-game day and publishes JSON envelopes over HTTP for later analysis.
 
 The initial shape is based on the Cyberstat idea of keeping the instrumentation layer separate from export/storage. For CS1 this matters because the game runs on an older Unity/Mono stack and mods should avoid expensive work on every simulation frame.
 

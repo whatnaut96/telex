@@ -7,8 +7,8 @@ namespace Telex.Serialization
         public int SchemaVersion;
         public string Type;
         public string CityName;
-        public DateTime SampledAtUtc;
-        public DateTime CurrentGameTime;
+        public string Date;
+        public DateTime GameTime;
         public uint CurrentFrameIndex;
         public int AbsoluteDay;
         public float RealTimeIntervalSeconds;

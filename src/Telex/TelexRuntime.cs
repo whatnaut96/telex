@@ -10,7 +10,7 @@ namespace Telex
         private static CitySampler sampler;
         private static ITelemetrySink sink;
         private static float elapsed;
-        private static int lastGameHour = -1;
+        private static int lastGameDay = -1;
         private static bool running;
 
         public static void Start(CitySampler citySampler, ITelemetrySink telemetrySink)
@@ -20,7 +20,7 @@ namespace Telex
             sampler = citySampler;
             sink = telemetrySink;
             elapsed = 0f;
-            lastGameHour = -1;
+            lastGameDay = -1;
             running = true;
             sink.Open();
         }
@@ -50,7 +50,7 @@ namespace Telex
                 sampler = null;
                 sink = null;
                 elapsed = 0f;
-                lastGameHour = -1;
+                lastGameDay = -1;
             }
         }
 
@@ -63,15 +63,15 @@ namespace Telex
 
             elapsed += realTimeDelta;
 
-            var gameHour = sampler.GetCurrentGameHour();
-            if (gameHour == lastGameHour)
+            var gameDay = sampler.GetCurrentGameDay();
+            if (gameDay == lastGameDay)
             {
                 return;
             }
 
             var interval = elapsed;
             elapsed = 0f;
-            lastGameHour = gameHour;
+            lastGameDay = gameDay;
 
             try
             {
