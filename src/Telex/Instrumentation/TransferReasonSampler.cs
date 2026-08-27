@@ -37,6 +37,24 @@ namespace Telex.Instrumentation
             return records;
         }
 
+        public static object SampleByResource()
+        {
+            var data = new Dictionary<string, object>();
+            var rows = Sample();
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i] as IDictionary<string, object>;
+                if (row == null || !row.ContainsKey("reason") || row["reason"] == null)
+                {
+                    continue;
+                }
+
+                data[Normalize(row["reason"].ToString())] = row;
+            }
+
+            return data;
+        }
+
         private static bool LooksLikeMaterialFlow(string name)
         {
             return Contains(name, "Goods")
@@ -94,6 +112,28 @@ namespace Telex.Instrumentation
         private static object Get(ushort[] values, int index)
         {
             return values != null && index >= 0 && index < values.Length ? (object)values[index] : null;
+        }
+
+        private static string Normalize(string name)
+        {
+            if (name == null)
+            {
+                return null;
+            }
+
+            var chars = new List<char>();
+            for (var i = 0; i < name.Length; i++)
+            {
+                var c = name[i];
+                if (i > 0 && char.IsUpper(c) && chars.Count > 0 && chars[chars.Count - 1] != '_')
+                {
+                    chars.Add('_');
+                }
+
+                chars.Add(char.ToLowerInvariant(c));
+            }
+
+            return new string(chars.ToArray());
         }
     }
 }

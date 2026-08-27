@@ -26,13 +26,8 @@ namespace Telex.Instrumentation
 
                 var record = new Dictionary<string, object>();
                 record["entity"] = id;
-                record["age"] = citizen.m_age;
                 record["age_group"] = AgeGroup(citizen.m_age);
                 record["education"] = Education(citizen.m_flags);
-                record["state"] = citizen.m_flags.ToString();
-                record["wellbeing"] = citizen.m_wellbeing;
-                record["health"] = citizen.m_health;
-                record["happiness"] = citizen.m_wellbeing;
                 record["home_building_id"] = NullZero(citizen.m_homeBuilding);
                 record["home_district_id"] = BuildingDistrict(citizen.m_homeBuilding);
                 record["workplace_building_id"] = NullZero(citizen.m_workBuilding);

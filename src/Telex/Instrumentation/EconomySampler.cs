@@ -18,16 +18,19 @@ namespace Telex.Instrumentation
             {
                 CaptureSimple(economy, data, "LastCashAmount", "LastCashDelta", "m_cashAmount", "m_cashDelta", "m_taxMultiplier", "m_startMoney");
                 data["tax_rates"] = TaxRateRecords(economy);
+                data["tax_rates_raw"] = ArrayRecords(economy, "m_taxRates");
                 data["service_budget_day"] = BudgetRecords(economy, false);
                 data["service_budget_night"] = BudgetRecords(economy, true);
+                data["income"] = EconomyResourceRecords(economy, "m_income");
                 data["income_by_resource"] = EconomyResourceMap(economy, "m_income");
+                data["total_income"] = EconomyResourceRecords(economy, "m_totalIncome");
                 data["total_income_by_resource"] = EconomyResourceMap(economy, "m_totalIncome");
+                data["expenses"] = EconomyResourceRecords(economy, "m_expenses");
                 data["expenses_by_resource"] = EconomyResourceMap(economy, "m_expenses");
                 data["loan_expenses"] = EconomyResourceRecords(economy, "m_loanExpenses");
                 data["policy_expenses"] = EconomyResourceRecords(economy, "m_policyExpenses");
+                data["total_expenses"] = EconomyResourceRecords(economy, "m_totalExpenses");
                 data["total_expenses_by_resource"] = EconomyResourceMap(economy, "m_totalExpenses");
-                data["loans"] = LoanRecords(economy);
-                AddCyberstatAliases(data);
             }
 
             if (population != null)
@@ -36,81 +39,6 @@ namespace Telex.Instrumentation
             }
 
             return data;
-        }
-
-        private static void AddCyberstatAliases(IDictionary<string, object> data)
-        {
-            data["balance"] = Get(data, "cash_amount");
-            data["income_tax_residential"] = null;
-            data["income_tax_commercial"] = null;
-            data["income_tax_industrial"] = null;
-            data["income_tax_office"] = null;
-            data["income_government_subsidy"] = null;
-            data["expense_service_upkeep"] = SumMap(data["expenses_by_resource"] as IDictionary<string, object>);
-            data["expense_loan_interest"] = SumRecords(data["loan_expenses"] as IList<object>);
-            data["expense_subsidy_commercial"] = null;
-            data["expense_subsidy_industrial"] = null;
-            data["expense_subsidy_office"] = null;
-            data["expense_subsidy_residential"] = null;
-            data["tax_rates_residential"] = ResidentialTaxRates();
-        }
-
-        private static object ResidentialTaxRates()
-        {
-            var economy = Singleton<EconomyManager>.instance;
-            var data = new Dictionary<string, object>();
-            if (economy == null)
-            {
-                return data;
-            }
-
-            data["low_density"] = economy.GetTaxRate(ItemClass.Service.Residential, ItemClass.SubService.ResidentialLow, ItemClass.Level.Level1);
-            data["high_density"] = economy.GetTaxRate(ItemClass.Service.Residential, ItemClass.SubService.ResidentialHigh, ItemClass.Level.Level1);
-            return data;
-        }
-
-        private static object SumRecords(IList<object> records)
-        {
-            if (records == null)
-            {
-                return null;
-            }
-
-            long total = 0;
-            for (var i = 0; i < records.Count; i++)
-            {
-                var record = records[i] as IDictionary<string, object>;
-                if (record != null && record.ContainsKey("value") && record["value"] != null)
-                {
-                    total += System.Convert.ToInt64(record["value"]);
-                }
-            }
-
-            return total;
-        }
-
-        private static object SumMap(IDictionary<string, object> values)
-        {
-            if (values == null)
-            {
-                return null;
-            }
-
-            long total = 0;
-            foreach (var value in values.Values)
-            {
-                if (value != null)
-                {
-                    total += System.Convert.ToInt64(value);
-                }
-            }
-
-            return total;
-        }
-
-        private static object Get(IDictionary<string, object> data, string key)
-        {
-            return data.ContainsKey(key) ? data[key] : null;
         }
 
         private static IList<object> EconomyResourceRecords(object source, string fieldName)
@@ -257,7 +185,6 @@ namespace Telex.Instrumentation
             var serviceName = service.ToString();
             var subServiceName = subService.ToString();
             var record = new Dictionary<string, object>();
-            record["key"] = Normalize(serviceName) + "." + Normalize(subServiceName);
             record["service"] = serviceName;
             record["sub_service"] = subServiceName;
             record["period"] = night ? "night" : "day";

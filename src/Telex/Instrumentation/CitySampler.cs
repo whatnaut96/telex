@@ -9,11 +9,8 @@ namespace Telex.Instrumentation
 {
     internal sealed class CitySampler
     {
-        private readonly DlcReflectionSampler dlcSampler;
-
         public CitySampler()
         {
-            dlcSampler = new DlcReflectionSampler();
         }
 
         public int GetCurrentGameDay()
@@ -33,9 +30,11 @@ namespace Telex.Instrumentation
             records.Add(CreateRecord("economy", realTimeInterval, simulationTimeDelta, GenerateEconomySnapshot()));
             records.Add(CreateRecord("resources", realTimeInterval, simulationTimeDelta, GenerateResourceSnapshot()));
             records.Add(CreateRecord("buildings", realTimeInterval, simulationTimeDelta, GenerateBuildingSnapshot()));
+            records.Add(CreateRecord("citizens", realTimeInterval, simulationTimeDelta, CitizenSampler.Sample()));
+            records.Add(CreateRecord("roads", realTimeInterval, simulationTimeDelta, RoadSampler.Sample()));
+            records.Add(CreateRecord("industry_areas", realTimeInterval, simulationTimeDelta, IndustryAreaSampler.Sample()));
             records.Add(CreateRecord("districts", realTimeInterval, simulationTimeDelta, GenerateDistrictSnapshot()));
             records.Add(CreateRecord("transport", realTimeInterval, simulationTimeDelta, GenerateTransportSnapshot()));
-            records.Add(CreateRecord("dlc_managers", realTimeInterval, simulationTimeDelta, dlcSampler.Sample()));
             return records;
         }
 
@@ -64,29 +63,15 @@ namespace Telex.Instrumentation
 
         private static object GenerateEconomySnapshot()
         {
-            var economy = Singleton<EconomyManager>.instance;
-            var population = Singleton<CitizenManager>.instance;
-
-            var data = new Dictionary<string, object>();
-            if (economy != null)
-            {
-                ReflectionCaptureSimple(economy, data, "LastCashAmount", "LastCashDelta", "m_cashAmount", "m_cashDelta", "m_taxRate");
-            }
-
-            if (population != null)
-            {
-                data["population"] = population.m_citizenCount;
-            }
-
-            return data;
+            return EconomySampler.Sample();
         }
 
         private static object GenerateResourceSnapshot()
         {
             var data = new Dictionary<string, object>();
             data["transfer_reasons"] = TransferReasonSampler.Sample();
+            data["resources"] = TransferReasonSampler.SampleByResource();
             data["natural_resources"] = ResourceManagerSampler.SampleNaturalResources();
-            data["industry_areas"] = ResourceManagerSampler.SampleIndustryAreas();
             return data;
         }
 
@@ -109,22 +94,22 @@ namespace Telex.Instrumentation
                 }
 
                 var info = building.Info;
+                var districtId = Singleton<DistrictManager>.instance.GetDistrict(building.m_position);
                 var record = new Dictionary<string, object>();
                 record["building_id"] = id;
-                record["name"] = manager.GetBuildingName(id, InstanceID.Empty);
-                record["prefab"] = info == null ? null : info.name;
-                record["ai"] = info == null || info.m_buildingAI == null ? null : info.m_buildingAI.GetType().Name;
+                record["zone_type"] = ZoneType(info);
+                record["service"] = info == null || info.m_class == null ? null : info.m_class.m_service.ToString();
+                record["sub_service"] = info == null || info.m_class == null ? null : info.m_class.m_subService.ToString();
                 record["position"] = Vector(building.m_position);
-                record["level"] = building.m_level;
-                record["flags"] = building.m_flags.ToString();
-                record["problems"] = building.m_problems.ToString();
-                record["fire_intensity"] = building.m_fireIntensity;
                 record["health"] = building.m_health;
                 record["garbage_buffer"] = building.m_garbageBuffer;
                 record["water_buffer"] = building.m_waterBuffer;
                 record["sewage_buffer"] = building.m_sewageBuffer;
                 record["electricity_buffer"] = building.m_electricityBuffer;
-                record["district_id"] = Singleton<DistrictManager>.instance.GetDistrict(building.m_position);
+                record["district"] = districtId == 0 ? null : (object)districtId;
+                record["district_name"] = DistrictName(districtId);
+                record["road_edge"] = building.m_accessSegment;
+                record["curve_position"] = building.m_angle;
                 record["industry"] = BuildingIndustrySampler.Sample(id, building, info);
 
                 records.Add(record);
@@ -215,13 +200,57 @@ namespace Telex.Instrumentation
             return (int)gameTime.Date.Subtract(new DateTime(gameTime.Year, 1, 1)).TotalDays;
         }
 
-        private static object Vector(Vector3 value)
+        public static object Vector(Vector3 value)
         {
             var result = new Dictionary<string, object>();
             result["x"] = value.x;
             result["y"] = value.y;
             result["z"] = value.z;
             return result;
+        }
+
+        public static string ZoneType(BuildingInfo info)
+        {
+            if (info == null || info.m_class == null)
+            {
+                return null;
+            }
+
+            var service = info.m_class.m_service;
+            var subService = info.m_class.m_subService.ToString();
+            if (service == ItemClass.Service.Residential)
+            {
+                return "residential";
+            }
+            if (service == ItemClass.Service.Commercial)
+            {
+                return "commercial";
+            }
+            if (service == ItemClass.Service.Industrial)
+            {
+                return "industrial";
+            }
+            if (service == ItemClass.Service.Office)
+            {
+                return "office";
+            }
+            if (subService.IndexOf("Industrial", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "industrial";
+            }
+
+            return "other";
+        }
+
+        private static string DistrictName(byte districtId)
+        {
+            if (districtId == 0)
+            {
+                return GetCityName();
+            }
+
+            var manager = Singleton<DistrictManager>.instance;
+            return manager == null ? null : manager.GetDistrictName(districtId);
         }
 
         private static void ReflectionCaptureSimple(object source, IDictionary<string, object> target, params string[] names)

@@ -1,5 +1,6 @@
-using System.Collections.Generic;
 using ColossalFramework;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Telex.Instrumentation
 {
@@ -28,6 +29,7 @@ namespace Telex.Instrumentation
                 record["name"] = manager.GetParkName(id);
                 record["type"] = park.m_parkType.ToString();
                 record["level"] = park.m_parkLevel.ToString();
+                record["synthetic_gis"] = SyntheticGis(manager, id, park);
                 record["flags"] = park.m_flags.ToString();
                 record["policies"] = park.m_parkPolicies.ToString();
                 record["policies_effect"] = park.m_parkPoliciesEffect.ToString();
@@ -43,6 +45,96 @@ namespace Telex.Instrumentation
             }
 
             return records;
+        }
+
+        private static object SyntheticGis(DistrictManager districtManager, byte parkId, DistrictPark park)
+        {
+            var data = new Dictionary<string, object>();
+            data["geometry_type"] = "synthetic_industry_area";
+            data["label_point"] = CitySampler.Vector(park.m_nameLocation);
+
+            int minX;
+            int minZ;
+            int maxX;
+            int maxZ;
+            districtManager.GetParkArea(parkId, out minX, out minZ, out maxX, out maxZ);
+            var gridBounds = new Dictionary<string, object>();
+            gridBounds["min_x"] = minX;
+            gridBounds["min_z"] = minZ;
+            gridBounds["max_x"] = maxX;
+            gridBounds["max_z"] = maxZ;
+            data["park_grid_bounds"] = gridBounds;
+
+            var buildingIds = new List<object>();
+            var buildingPoints = new List<object>();
+            var buildingExtent = BuildingExtent(park, buildingIds, buildingPoints);
+            data["building_ids"] = buildingIds;
+            data["building_points"] = buildingPoints;
+            data["building_bounds"] = buildingExtent.ContainsKey("bounds") ? buildingExtent["bounds"] : null;
+            data["building_centroid"] = buildingExtent.ContainsKey("centroid") ? buildingExtent["centroid"] : null;
+            return data;
+        }
+
+        private static IDictionary<string, object> BuildingExtent(DistrictPark park, IList<object> buildingIds, IList<object> buildingPoints)
+        {
+            var result = new Dictionary<string, object>();
+            if (park.m_buildings == null || park.m_buildings.m_size == 0)
+            {
+                return result;
+            }
+
+            var manager = Singleton<BuildingManager>.instance;
+            if (manager == null)
+            {
+                return result;
+            }
+
+            var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            var sum = Vector3.zero;
+            var count = 0;
+
+            for (var i = 0; i < park.m_buildings.m_size; i++)
+            {
+                var buildingId = park.m_buildings.m_buffer[i];
+                if (buildingId == 0)
+                {
+                    continue;
+                }
+
+                var building = manager.m_buildings.m_buffer[buildingId];
+                if ((building.m_flags & Building.Flags.Created) == 0)
+                {
+                    continue;
+                }
+
+                var point = new Dictionary<string, object>();
+                point["building_id"] = buildingId;
+                point["position"] = CitySampler.Vector(building.m_position);
+                buildingIds.Add(buildingId);
+                buildingPoints.Add(point);
+
+                min.x = Mathf.Min(min.x, building.m_position.x);
+                min.y = Mathf.Min(min.y, building.m_position.y);
+                min.z = Mathf.Min(min.z, building.m_position.z);
+                max.x = Mathf.Max(max.x, building.m_position.x);
+                max.y = Mathf.Max(max.y, building.m_position.y);
+                max.z = Mathf.Max(max.z, building.m_position.z);
+                sum += building.m_position;
+                count++;
+            }
+
+            if (count == 0)
+            {
+                return result;
+            }
+
+            var bounds = new Dictionary<string, object>();
+            bounds["min"] = CitySampler.Vector(min);
+            bounds["max"] = CitySampler.Vector(max);
+            result["bounds"] = bounds;
+            result["centroid"] = CitySampler.Vector(sum / count);
+            return result;
         }
 
         private static object ResourceRecords(DistrictPark park)
