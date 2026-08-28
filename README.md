@@ -1,3 +1,9 @@
+# THIS HAS BEEN ARCHIVED
+I really wanted this one to pan out but had trouble really getting anything useful out.
+
+I basically wanted cyberstat for CS1 and that just isn't the case here so I'm archiving this for now.
+
+
 # Telex
 
 Telex is a Cities: Skylines 1 instrumentation mod. It samples city state once per in-game day and publishes JSON envelopes over HTTP for later analysis.
