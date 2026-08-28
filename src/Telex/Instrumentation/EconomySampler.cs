@@ -11,31 +11,20 @@ namespace Telex.Instrumentation
         public static object Sample()
         {
             var economy = Singleton<EconomyManager>.instance;
-            var population = Singleton<CitizenManager>.instance;
 
             var data = new Dictionary<string, object>();
             if (economy != null)
             {
-                CaptureSimple(economy, data, "LastCashAmount", "LastCashDelta", "m_cashAmount", "m_cashDelta", "m_taxMultiplier", "m_startMoney");
+                CaptureSimple(economy, data, "LastCashAmount", "m_cashAmount", "m_taxMultiplier", "m_startMoney");
                 data["tax_rates"] = TaxRateRecords(economy);
-                data["tax_rates_raw"] = ArrayRecords(economy, "m_taxRates");
                 data["service_budget_day"] = BudgetRecords(economy, false);
                 data["service_budget_night"] = BudgetRecords(economy, true);
-                data["income"] = EconomyResourceRecords(economy, "m_income");
                 data["income_by_resource"] = EconomyResourceMap(economy, "m_income");
-                data["total_income"] = EconomyResourceRecords(economy, "m_totalIncome");
                 data["total_income_by_resource"] = EconomyResourceMap(economy, "m_totalIncome");
-                data["expenses"] = EconomyResourceRecords(economy, "m_expenses");
                 data["expenses_by_resource"] = EconomyResourceMap(economy, "m_expenses");
                 data["loan_expenses"] = EconomyResourceRecords(economy, "m_loanExpenses");
                 data["policy_expenses"] = EconomyResourceRecords(economy, "m_policyExpenses");
-                data["total_expenses"] = EconomyResourceRecords(economy, "m_totalExpenses");
                 data["total_expenses_by_resource"] = EconomyResourceMap(economy, "m_totalExpenses");
-            }
-
-            if (population != null)
-            {
-                data["population"] = population.m_citizenCount;
             }
 
             return data;
@@ -86,7 +75,7 @@ namespace Telex.Instrumentation
                 }
 
                 var key = Normalize(names[i]);
-                records[key] = values.GetValue(i);
+                records[key] = ConvertMoney(values.GetValue(i));
             }
 
             return records;
@@ -95,49 +84,22 @@ namespace Telex.Instrumentation
         private static IList<object> TaxRateRecords(EconomyManager economy)
         {
             var records = new List<object>();
-            AddTaxRates(economy, records, ItemClass.Service.Residential, ItemClass.SubService.ResidentialLow);
-            AddTaxRates(economy, records, ItemClass.Service.Residential, ItemClass.SubService.ResidentialHigh);
-            AddTaxRates(economy, records, ItemClass.Service.Residential, ItemClass.SubService.ResidentialLowEco);
-            AddTaxRates(economy, records, ItemClass.Service.Residential, ItemClass.SubService.ResidentialHighEco);
-            AddTaxRates(economy, records, ItemClass.Service.Residential, ItemClass.SubService.ResidentialWallToWall);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialLow);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialHigh);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialLeisure);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialTourist);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialEco);
-            AddTaxRates(economy, records, ItemClass.Service.Commercial, ItemClass.SubService.CommercialWallToWall);
-            AddTaxRates(economy, records, ItemClass.Service.Industrial, ItemClass.SubService.IndustrialGeneric);
-            AddTaxRates(economy, records, ItemClass.Service.Industrial, ItemClass.SubService.IndustrialForestry);
-            AddTaxRates(economy, records, ItemClass.Service.Industrial, ItemClass.SubService.IndustrialFarming);
-            AddTaxRates(economy, records, ItemClass.Service.Industrial, ItemClass.SubService.IndustrialOil);
-            AddTaxRates(economy, records, ItemClass.Service.Industrial, ItemClass.SubService.IndustrialOre);
-            AddTaxRates(economy, records, ItemClass.Service.Office, ItemClass.SubService.OfficeGeneric);
-            AddTaxRates(economy, records, ItemClass.Service.Office, ItemClass.SubService.OfficeHightech);
-            AddTaxRates(economy, records, ItemClass.Service.Office, ItemClass.SubService.OfficeWallToWall);
-            AddTaxRates(economy, records, ItemClass.Service.Office, ItemClass.SubService.OfficeFinancial);
+            AddTaxRate(economy, records, "residential_low", ItemClass.Service.Residential, ItemClass.SubService.ResidentialLow);
+            AddTaxRate(economy, records, "residential_high", ItemClass.Service.Residential, ItemClass.SubService.ResidentialHigh);
+            AddTaxRate(economy, records, "commercial_low", ItemClass.Service.Commercial, ItemClass.SubService.CommercialLow);
+            AddTaxRate(economy, records, "commercial_high", ItemClass.Service.Commercial, ItemClass.SubService.CommercialHigh);
+            AddTaxRate(economy, records, "office", ItemClass.Service.Office, ItemClass.SubService.OfficeGeneric);
+            AddTaxRate(economy, records, "industry", ItemClass.Service.Industrial, ItemClass.SubService.IndustrialGeneric);
             return records;
         }
 
-        private static void AddTaxRates(EconomyManager economy, IList<object> records, ItemClass.Service service, ItemClass.SubService subService)
+        private static void AddTaxRate(EconomyManager economy, IList<object> records, string category, ItemClass.Service service, ItemClass.SubService subService)
         {
-            AddTaxRate(economy, records, service, subService, ItemClass.Level.Level1);
-            AddTaxRate(economy, records, service, subService, ItemClass.Level.Level2);
-            AddTaxRate(economy, records, service, subService, ItemClass.Level.Level3);
-            AddTaxRate(economy, records, service, subService, ItemClass.Level.Level4);
-            AddTaxRate(economy, records, service, subService, ItemClass.Level.Level5);
-        }
-
-        private static void AddTaxRate(EconomyManager economy, IList<object> records, ItemClass.Service service, ItemClass.SubService subService, ItemClass.Level level)
-        {
-            var serviceName = service.ToString();
-            var subServiceName = subService.ToString();
-            var levelName = level.ToString();
             var record = new Dictionary<string, object>();
-            record["key"] = Normalize(serviceName) + "." + Normalize(subServiceName) + "." + Normalize(levelName);
-            record["service"] = serviceName;
-            record["sub_service"] = subServiceName;
-            record["level"] = levelName;
-            record["value"] = economy.GetTaxRate(service, subService, level);
+            record["category"] = category;
+            record["service"] = Normalize(service.ToString());
+            record["sub_service"] = SubServiceName(subService);
+            record["value"] = economy.GetTaxRate(service, subService, ItemClass.Level.Level1);
             records.Add(record);
         }
 
@@ -183,33 +145,17 @@ namespace Telex.Instrumentation
         private static void AddBudget(IList<object> records, EconomyManager economy, ItemClass.Service service, ItemClass.SubService subService, bool night)
         {
             var serviceName = service.ToString();
-            var subServiceName = subService.ToString();
             var record = new Dictionary<string, object>();
-            record["service"] = serviceName;
-            record["sub_service"] = subServiceName;
+            record["service"] = Normalize(serviceName);
+            record["sub_service"] = SubServiceName(subService);
             record["period"] = night ? "night" : "day";
             record["value"] = economy.GetBudget(service, subService, night);
             records.Add(record);
         }
 
-        private static IList<object> ArrayRecords(object source, string fieldName)
+        private static string SubServiceName(ItemClass.SubService subService)
         {
-            var values = GetArray(source, fieldName);
-            var records = new List<object>();
-            if (values == null)
-            {
-                return records;
-            }
-
-            for (var i = 0; i < values.Length; i++)
-            {
-                var record = new Dictionary<string, object>();
-                record["index"] = i;
-                record["value"] = values.GetValue(i);
-                records.Add(record);
-            }
-
-            return records;
+            return subService == ItemClass.SubService.None ? "none" : Normalize(subService.ToString());
         }
 
         private static IList<object> LoanRecords(object source)
@@ -261,8 +207,25 @@ namespace Telex.Instrumentation
                     continue;
                 }
 
-                target[Normalize(name)] = ConvertValue(field.GetValue(source));
+                var key = Normalize(name);
+                var value = field.GetValue(source);
+                target[key] = IsMoneyField(key) ? ConvertMoney(value) : ConvertValue(value);
             }
+        }
+
+        private static bool IsMoneyField(string key)
+        {
+            return key == "last_cash_amount" || key == "cash_amount" || key == "start_money";
+        }
+
+        private static object ConvertMoney(object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            return System.Convert.ToDouble(value) / 100d;
         }
 
         private static object ConvertValue(object value)

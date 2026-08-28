@@ -8,7 +8,6 @@ namespace Telex.Instrumentation
         public static IList<object> Sample()
         {
             var manager = Singleton<CitizenManager>.instance;
-            var buildingManager = Singleton<BuildingManager>.instance;
             var records = new List<object>();
             if (manager == null)
             {
@@ -25,17 +24,14 @@ namespace Telex.Instrumentation
                 }
 
                 var record = new Dictionary<string, object>();
-                record["entity"] = id;
+                record["entity_id"] = id;
+                record["age"] = citizen.m_age;
                 record["age_group"] = AgeGroup(citizen.m_age);
-                record["education"] = Education(citizen.m_flags);
+                record["education_level"] = Education(citizen.m_flags);
                 record["home_building_id"] = NullZero(citizen.m_homeBuilding);
                 record["home_district_id"] = BuildingDistrict(citizen.m_homeBuilding);
                 record["workplace_building_id"] = NullZero(citizen.m_workBuilding);
-                record["workplace_name"] = BuildingName(buildingManager, citizen.m_workBuilding);
-                record["workplace_zone_type"] = BuildingZoneType(citizen.m_workBuilding);
-                record["is_tourist"] = (citizen.m_flags & Citizen.Flags.Tourist) != 0;
-                record["is_student"] = (citizen.m_flags & Citizen.Flags.Student) != 0;
-                record["is_unemployed"] = (citizen.m_flags & Citizen.Flags.Unemployed) != 0;
+                record["workplace_type"] = BuildingZoneType(citizen.m_workBuilding);
                 records.Add(record);
             }
 
@@ -58,16 +54,6 @@ namespace Telex.Instrumentation
 
             var building = manager.m_buildings.m_buffer[buildingId];
             return districtManager.GetDistrict(building.m_position);
-        }
-
-        private static string BuildingName(BuildingManager manager, ushort buildingId)
-        {
-            if (manager == null || buildingId == 0)
-            {
-                return null;
-            }
-
-            return manager.GetBuildingName(buildingId, InstanceID.Empty);
         }
 
         private static string BuildingZoneType(ushort buildingId)

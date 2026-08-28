@@ -15,6 +15,11 @@ namespace Telex.Instrumentation
 
             var ai = info.m_buildingAI;
             var aiType = ai.GetType().Name;
+            if (aiType == "IndustrialBuildingAI")
+            {
+                return null;
+            }
+
             if (!IsInterestingAi(aiType))
             {
                 return null;
@@ -79,13 +84,12 @@ namespace Telex.Instrumentation
                 return "park_area";
             }
 
-            return "industry_related";
+            return "other";
         }
 
         private static object Classification(object ai, string aiType)
         {
             var data = new Dictionary<string, object>();
-            data["ai_type"] = aiType;
             data["role"] = IndustryRole(aiType);
             AddIfPresent(data, "industry_area_type", ai, "m_industryType");
             AddIfPresent(data, "campus_type", ai, "m_campusType");

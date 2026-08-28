@@ -1,8 +1,8 @@
 # Telex
 
-Telex is a Cities: Skylines 1 instrumentation mod scaffold. It samples city state once per in-game day and publishes JSON envelopes over HTTP for later analysis.
+Telex is a Cities: Skylines 1 instrumentation mod. It samples city state once per in-game day and publishes JSON envelopes over HTTP for later analysis.
 
-The initial shape is based on the Cyberstat idea of keeping the instrumentation layer separate from export/storage. For CS1 this matters because the game runs on an older Unity/Mono stack and mods should avoid expensive work on every simulation frame.
+The schema is built around CS1 mechanics: districts, park/industry areas, transfer reasons, service budgets, roads, buildings, and citizens. Sampling stays coarse because CS1 runs on an older Unity/Mono stack and mods should avoid expensive work on every simulation frame.
 
 ## Layout
 
@@ -29,7 +29,8 @@ make
 If you use Nix:
 
 ```sh
-nix-shell --run make
+nix develop
+make
 ```
 
 The DLL is written to `build/Telex.dll`.
@@ -67,15 +68,33 @@ Runtime settings:
 
 The older file sink still exists as `JsonLinesTelemetrySink`, but `HttpTelemetrySink` is wired as the default.
 
+## Dummy Receiver
+
+Run the local Go receiver while Telex is posting:
+
+```sh
+go run ./cmd/synco
+```
+
+It listens on `127.0.0.1:2145` and writes each POST to:
+
+```text
+synco/{category}/{timestamp}.json
+```
+
+The category comes from the `type` query parameter or telemetry envelope. The filename timestamp comes from the in-game `date` field.
+
 ## Current Samples
 
-Telex writes one JSON envelope per domain, similar to Cyberstat's `type`-based publishing model:
+Telex writes one JSON envelope per telemetry domain:
 
-- `economy` - cash and delta fields from `EconomyManager`, plus population.
-- `resources` - material-like `TransferManager.TransferReason` rows with incoming/outgoing offer amounts and counts, natural resource totals, and reflected industry-area manager state.
-- `buildings` - one record per created building with prefab, AI type, position, district, core utility buffers, import/export buffers, production rate, cargo traffic, and reflected industry/campus/warehouse AI fields.
+- `economy` - cash amount, tax rates, day/night service budgets, named income/expense maps, loan expenses, and policy expenses. Population and cash deltas are derived from daily `citizens` and `economy` snapshots.
+- `resources` - transfer reason flow counters and natural resource totals.
+- `buildings` - building positions, utility buffers, district/road references, and CS1-native industry building fields grouped as classification, materials, production, logistics, utilities, employment, costs, and problems.
+- `citizens` - citizen census records with home/work building refs, home district, workplace name/zone, age group, education flags, health, wellbeing, and employment/student/tourist flags. Per-instance and vehicle refs are intentionally omitted.
+- `roads` - road segment graph records with node references, curve points, traffic fields, and building access edges.
+- `industry_areas` - CS1 Industries/Campus/Parklife-style area records from `DistrictManager.m_parks`, including synthetic GIS placement, area type/level, policies, worker/storage deltas, production amount, and per-resource production/consumption/import/export/buffer data.
 - `districts` - district IDs, names, and policy-like fields when present.
-- `transport` - line names, stop counts, vehicle counts, and passenger counts.
-- `dlc_managers` - optional DLC-style manager snapshots discovered by reflection, including likely park/industry/campus manager objects when present.
+- `transport` - public transport line names, stop counts, vehicle counts, and passenger counts.
 
 The reflection samplers are deliberately shallow. They record primitive or enum fields and avoid walking object graphs.

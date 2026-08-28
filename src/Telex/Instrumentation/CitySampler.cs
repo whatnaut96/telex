@@ -43,19 +43,13 @@ namespace Telex.Instrumentation
             var simulation = Singleton<SimulationManager>.instance;
 
             var record = new TelemetryRecord();
-            record.SchemaVersion = 1;
             record.Type = type;
             record.CityName = GetCityName();
-            record.RealTimeIntervalSeconds = realTimeInterval;
-            record.SimulationTimeDeltaSeconds = simulationTimeDelta;
             record.Data = data;
 
             if (simulation != null)
             {
-                record.CurrentFrameIndex = simulation.m_currentFrameIndex;
-                record.GameTime = simulation.m_currentGameTime;
                 record.Date = simulation.m_currentGameTime.ToString("yyyy-MM-dd");
-                record.AbsoluteDay = GetAbsoluteGameDay(simulation.m_currentGameTime);
             }
 
             return record;
@@ -94,20 +88,23 @@ namespace Telex.Instrumentation
                 }
 
                 var info = building.Info;
-                var districtId = Singleton<DistrictManager>.instance.GetDistrict(building.m_position);
+                var districtManager = Singleton<DistrictManager>.instance;
+                var districtId = districtManager == null ? (byte)0 : districtManager.GetDistrict(building.m_position);
+                var parkId = districtManager == null ? (byte)0 : districtManager.GetPark(building.m_position);
                 var record = new Dictionary<string, object>();
                 record["building_id"] = id;
                 record["zone_type"] = ZoneType(info);
-                record["service"] = info == null || info.m_class == null ? null : info.m_class.m_service.ToString();
-                record["sub_service"] = info == null || info.m_class == null ? null : info.m_class.m_subService.ToString();
+                record["service"] = ServiceType(info);
+                record["sub_service"] = SubServiceType(info);
                 record["position"] = Vector(building.m_position);
-                record["health"] = building.m_health;
                 record["garbage_buffer"] = building.m_garbageBuffer;
                 record["water_buffer"] = building.m_waterBuffer;
                 record["sewage_buffer"] = building.m_sewageBuffer;
                 record["electricity_buffer"] = building.m_electricityBuffer;
                 record["district"] = districtId == 0 ? null : (object)districtId;
                 record["district_name"] = DistrictName(districtId);
+                record["industry_area_id"] = parkId == 0 ? null : (object)parkId;
+                record["industry_area_name"] = ParkName(districtManager, parkId);
                 record["road_edge"] = building.m_accessSegment;
                 record["curve_position"] = building.m_angle;
                 record["industry"] = BuildingIndustrySampler.Sample(id, building, info);
@@ -213,7 +210,7 @@ namespace Telex.Instrumentation
         {
             if (info == null || info.m_class == null)
             {
-                return null;
+                return "unknown";
             }
 
             var service = info.m_class.m_service;
@@ -228,7 +225,11 @@ namespace Telex.Instrumentation
             }
             if (service == ItemClass.Service.Industrial)
             {
-                return "industrial";
+                return "zoned_industry";
+            }
+            if (service == ItemClass.Service.PlayerIndustry)
+            {
+                return "controlled_industry";
             }
             if (service == ItemClass.Service.Office)
             {
@@ -236,10 +237,50 @@ namespace Telex.Instrumentation
             }
             if (subService.IndexOf("Industrial", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                return "industrial";
+                return "zoned_industry";
+            }
+            if (subService.IndexOf("PlayerIndustry", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "controlled_industry";
             }
 
             return "other";
+        }
+
+        private static string ServiceType(BuildingInfo info)
+        {
+            if (info == null || info.m_class == null)
+            {
+                return "unknown";
+            }
+
+            var service = info.m_class.m_service;
+            if (service == ItemClass.Service.Industrial)
+            {
+                return "zoned_industry";
+            }
+            if (service == ItemClass.Service.PlayerIndustry)
+            {
+                return "controlled_industry";
+            }
+
+            return ToSnakeCase(service.ToString());
+        }
+
+        private static string SubServiceType(BuildingInfo info)
+        {
+            if (info == null || info.m_class == null)
+            {
+                return "none";
+            }
+
+            var subService = info.m_class.m_subService;
+            if (subService == ItemClass.SubService.None)
+            {
+                return "none";
+            }
+
+            return ToSnakeCase(subService.ToString());
         }
 
         private static string DistrictName(byte districtId)
@@ -251,6 +292,11 @@ namespace Telex.Instrumentation
 
             var manager = Singleton<DistrictManager>.instance;
             return manager == null ? null : manager.GetDistrictName(districtId);
+        }
+
+        private static string ParkName(DistrictManager manager, byte parkId)
+        {
+            return manager == null || parkId == 0 ? null : manager.GetParkName(parkId);
         }
 
         private static void ReflectionCaptureSimple(object source, IDictionary<string, object> target, params string[] names)
@@ -287,6 +333,28 @@ namespace Telex.Instrumentation
         private static string NormalizeMemberName(string name)
         {
             return name != null && name.StartsWith("m_") ? name.Substring(2) : name;
+        }
+
+        private static string ToSnakeCase(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return name;
+            }
+
+            var chars = new List<char>();
+            for (var i = 0; i < name.Length; i++)
+            {
+                var c = name[i];
+                if (i > 0 && char.IsUpper(c) && chars.Count > 0 && chars[chars.Count - 1] != '_')
+                {
+                    chars.Add('_');
+                }
+
+                chars.Add(char.ToLowerInvariant(c));
+            }
+
+            return new string(chars.ToArray());
         }
     }
 }
